@@ -11,3 +11,4 @@ I was inspired by:
 * https://github.com/launchbadge/sqlx/blob/v0.6.2/README.md
 * https://tms-dev-blog.com/rust-sqlx-basics-with-sqlite/
 * https://cargo-generate.github.io/cargo-generate/index.html
+* https://github.com/juhaku/utoipa/blob/master/examples/todo-axum/src/main.rs
