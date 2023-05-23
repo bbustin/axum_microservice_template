@@ -1,6 +1,6 @@
 # Microservice Template using Axum
-Microservice template using Axum and Sqlx that attemps to be flexible but not overly 
-complicated. Developed using Sqlite, but should work for other types.
+Microservice template using Axum, Sqlx, and utoipa that attempts to be flexible but not overly 
+complicated. Developed using Sqlite, but should work for other database types.
 
 Controller, model, and all code related to each entity type are contained in
 the same module. It feels to me like that makes it easier to reason about all the
