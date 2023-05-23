@@ -1,2 +1,2 @@
 pub mod controller;
-mod model;
+pub mod model; //unfortunately needs to be public for OpenApi documentation

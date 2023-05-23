@@ -1,6 +1,8 @@
 use axum::{response::IntoResponse, http::StatusCode, Json};
 use serde_json::json;
+use utoipa::ToSchema;
 
+#[derive(ToSchema)]
 pub enum ApiError {
     BadRequest,
     NotFound,

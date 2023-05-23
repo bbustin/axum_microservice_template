@@ -6,9 +6,29 @@ use std::{env, net::SocketAddr};
 use axum::{routing::{get, post, put, delete}, Router, Extension, response::Redirect};
 use sqlx::{Sqlite, migrate::MigrateDatabase, Pool};
 use tower_http::trace::TraceLayer;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[tokio::main]
 async fn main() {
+    #[derive(OpenApi)]
+    #[openapi(
+        paths(
+            tasks::controller::all_tasks,
+            tasks::controller::new_task,
+            tasks::controller::task,
+            tasks::controller::update_task,
+            tasks::controller::delete_task
+        ),
+        components(
+            schemas(tasks::model::Task, errors::ApiError)
+        ),
+        tags(
+            (name = "axum_microservice", description = "Axum Microservice Template")
+        )
+    )]
+    struct ApiDoc;
+
     // initialize tracing
     // Todo: make level configurable in .env?
     tracing_subscriber::fmt()
@@ -25,14 +45,15 @@ async fn main() {
 
     // create the app with routes
     let app = Router::new()
-    .route("/", get(|| async {Redirect::permanent("/tasks")}))
-    .route("/tasks", get(tasks::controller::all_tasks))
-    .route("/tasks", post(tasks::controller::new_task))
-    .route("/tasks/:id",get(tasks::controller::task))
-    .route("/tasks/:id", put(tasks::controller::update_task))
-    .route("/tasks/:id", delete(tasks::controller::delete_task))
-    .layer(Extension(pool))
-    .layer(TraceLayer::new_for_http());
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .route("/", get(|| async {Redirect::permanent("/tasks")}))
+        .route("/tasks", get(tasks::controller::all_tasks))
+        .route("/tasks", post(tasks::controller::new_task))
+        .route("/tasks/:id",get(tasks::controller::task))
+        .route("/tasks/:id", put(tasks::controller::update_task))
+        .route("/tasks/:id", delete(tasks::controller::delete_task))
+        .layer(Extension(pool))
+        .layer(TraceLayer::new_for_http());
 
     // run app
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000)); //todo: make IP and port configurable

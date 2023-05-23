@@ -7,13 +7,19 @@ use serde_json::{Value, json};
 use crate::GenericPool;
 use crate::errors::ApiError;
 
-use super::model::{self, Task};
+use super::model::{Task};
 
-
+#[utoipa::path(
+    get,
+    path = "/tasks",
+    responses(
+        (status = 200, description = "tasks", body = Vec<Task>)
+    )
+)]
 pub async fn all_tasks(Extension(pool): Extension<GenericPool>) -> Result<Json<Vec<Task>>, ApiError> {
     let sql = "SELECT * FROM task ".to_string();
 
-    let task = sqlx::query_as::<_, model::Task>(&sql).fetch_all(&pool)
+    let task = sqlx::query_as::<_, Task>(&sql).fetch_all(&pool)
         .await
         .map_err(|_| {
             ApiError::InternalServerError
@@ -22,10 +28,17 @@ pub async fn all_tasks(Extension(pool): Extension<GenericPool>) -> Result<Json<V
     Ok(Json(task))
 }
 
+#[utoipa::path(
+    get,
+    path = "/tasks/{id}",
+    responses(
+        (status = 200, description = "task", body = Task)
+    )
+)]
 pub async fn task(
     Path(id):Path<i32>, 
-    Extension(pool): Extension<GenericPool>) -> Result<Json<model::Task>, ApiError> {
-        let task: model::Task = sqlx::query_as("SELECT * FROM task where id=?")
+    Extension(pool): Extension<GenericPool>) -> Result<Json<Task>, ApiError> {
+        let task: Task = sqlx::query_as("SELECT * FROM task where id=?")
             .bind(id)
             .fetch_one(&pool)
             .await
@@ -36,10 +49,17 @@ pub async fn task(
         Ok(Json(task))  
 }
 
+#[utoipa::path(
+    post,
+    path = "/tasks",
+    responses(
+        (status = 200, description = "task", body = Task)
+    )
+)]
 pub async fn new_task(
     Extension(pool): Extension<GenericPool>, 
-    Json(task): Json<model::NewTask>) -> Result<(StatusCode, Json<model::Task>), ApiError> {
-        if task.task.is_empty() {
+    Json(task): Json<Task>) -> Result<(StatusCode, Json<Task>), ApiError> {
+        if task.id.is_some() || task.task.is_empty() {
             return Err(ApiError::BadRequest);
         }
 
@@ -51,16 +71,23 @@ pub async fn new_task(
                     ApiError::InternalServerError
                 })?.last_insert_rowid();
 
-        let task = model::Task { 
-            id, 
+        let task = Task { 
+            id: Some(id), 
             task: task.task
         };
 
         Ok((StatusCode::CREATED, Json(task)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/tasks/{id}",
+    responses(
+        (status = 200, description = "task", body = Task)
+    )
+)]
 async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
-    let _find: model::Task = sqlx::query_as("SELECT * FROM task where id=?")
+    let _find: Task = sqlx::query_as("SELECT * FROM task where id=?")
         .bind(id)
         .fetch_one(pool)
         .await
@@ -71,10 +98,21 @@ async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
         Ok(())
 }
 
+#[utoipa::path(
+    put,
+    path = "/tasks/{id}",
+    responses(
+        (status = 200, description = "task", body = Task)
+    )
+)]
 pub async fn update_task(
     Path(id): Path<i64>, 
     Extension(pool): Extension<GenericPool>,
-    Json(task): Json<model::UpdateTask>) -> Result<(StatusCode, Json<model::Task>), ApiError> {
+    Json(task): Json<Task>) -> Result<(StatusCode, Json<Task>), ApiError> {
+        if task.id.is_some() && task.id.unwrap() != id {
+            return Err(ApiError::BadRequest)
+        }
+
         find_task(&pool, id).await?;
 
         let _result = sqlx::query("UPDATE task SET task=? WHERE id=?")
@@ -83,14 +121,18 @@ pub async fn update_task(
             .execute(&pool)
             .await;
 
-        let task = model::Task {
-            id,
+        let task = Task {
+            id: Some(id),
             task: task.task
         };
 
         Ok((StatusCode::OK, Json(task)))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/tasks/{id}"
+)]
 pub async fn delete_task(
     Path(id): Path<i64>, 
     Extension(pool): Extension<GenericPool>) -> Result<(StatusCode, Json<Value>), ApiError> {
