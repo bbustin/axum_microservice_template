@@ -96,7 +96,7 @@ async fn database_setup()
 
 async fn create_database_if_missing(database_url: &str) {
     if !database_url.starts_with("sqlite://") {
-        tracing::debug!("Not using Sqlie database. Skipping automatic database creation");
+        tracing::debug!("Not using Sqlite database. Skipping automatic database creation");
         return;
     }
 
