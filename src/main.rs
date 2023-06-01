@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 mod tasks;
 mod errors; //makes custom errors available to modules
 
