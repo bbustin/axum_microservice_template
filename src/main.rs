@@ -3,11 +3,16 @@ mod errors; //makes custom errors available to modules
 
 use std::{env, net::SocketAddr};
 
-use axum::{routing::{get, post, put, delete}, Router, Extension, response::Redirect};
+use axum::{routing::{get, post, put, delete}, Router, response::Redirect};
 use sqlx::{Sqlite, migrate::MigrateDatabase, Pool};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+
+#[derive(Clone)]
+pub struct AppState {
+    pool: GenericPool
+}
 
 #[tokio::main]
 async fn main() {
@@ -41,7 +46,11 @@ async fn main() {
         Err(error) => panic!("Could not load .env file: {}", error),
     };
 
-    let pool: Pool<Sqlite> = database_setup().await.expect("Could not create database pool");
+    let pool: GenericPool = database_setup().await.expect("Could not create database pool");
+
+    let state = AppState {
+        pool: pool
+    };
 
     // create the app with routes
     let app = Router::new()
@@ -52,8 +61,8 @@ async fn main() {
         .route("/tasks/:id",get(tasks::controller::task))
         .route("/tasks/:id", put(tasks::controller::update_task))
         .route("/tasks/:id", delete(tasks::controller::delete_task))
-        .layer(Extension(pool))
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .with_state(state);
 
     // run app
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000)); //todo: make IP and port configurable

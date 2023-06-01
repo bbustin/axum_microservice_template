@@ -1,10 +1,10 @@
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 
-use axum::{Extension, Json};
+use axum::Json;
 use serde_json::{Value, json};
 
-use crate::GenericPool;
+use crate::{GenericPool, AppState};
 use crate::errors::ApiError;
 
 use super::model::{Task};
@@ -16,10 +16,10 @@ use super::model::{Task};
         (status = 200, description = "tasks", body = Vec<Task>)
     )
 )]
-pub async fn all_tasks(Extension(pool): Extension<GenericPool>) -> Result<Json<Vec<Task>>, ApiError> {
+pub async fn all_tasks(State(state): State<AppState>) -> Result<Json<Vec<Task>>, ApiError> {
     let sql = "SELECT * FROM task ".to_string();
 
-    let task = sqlx::query_as::<_, Task>(&sql).fetch_all(&pool)
+    let task = sqlx::query_as::<_, Task>(&sql).fetch_all(&state.pool)
         .await
         .map_err(|_| {
             ApiError::InternalServerError
@@ -37,10 +37,10 @@ pub async fn all_tasks(Extension(pool): Extension<GenericPool>) -> Result<Json<V
 )]
 pub async fn task(
     Path(id):Path<i32>, 
-    Extension(pool): Extension<GenericPool>) -> Result<Json<Task>, ApiError> {
+    State(state): State<AppState>) -> Result<Json<Task>, ApiError> {
         let task: Task = sqlx::query_as("SELECT * FROM task where id=?")
             .bind(id)
-            .fetch_one(&pool)
+            .fetch_one(&state.pool)
             .await
             .map_err(|_| {
                 ApiError::NotFound
@@ -57,7 +57,7 @@ pub async fn task(
     )
 )]
 pub async fn new_task(
-    Extension(pool): Extension<GenericPool>, 
+    State(state): State<AppState>, 
     Json(task): Json<Task>) -> Result<(StatusCode, Json<Task>), ApiError> {
         if task.id.is_some() || task.task.is_empty() {
             return Err(ApiError::BadRequest);
@@ -65,7 +65,7 @@ pub async fn new_task(
 
         let id = sqlx::query("INSERT INTO task (task) values (?)")
                 .bind(&task.task)
-                .execute(&pool)
+                .execute(&state.pool)
                 .await
                 .map_err(|_| {
                     ApiError::InternalServerError
@@ -79,13 +79,6 @@ pub async fn new_task(
         Ok((StatusCode::CREATED, Json(task)))
 }
 
-#[utoipa::path(
-    get,
-    path = "/tasks/{id}",
-    responses(
-        (status = 200, description = "task", body = Task)
-    )
-)]
 async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
     let _find: Task = sqlx::query_as("SELECT * FROM task where id=?")
         .bind(id)
@@ -107,18 +100,18 @@ async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
 )]
 pub async fn update_task(
     Path(id): Path<i64>, 
-    Extension(pool): Extension<GenericPool>,
+    State(state): State<AppState>,
     Json(task): Json<Task>) -> Result<(StatusCode, Json<Task>), ApiError> {
         if task.id.is_some() && task.id.unwrap() != id {
             return Err(ApiError::BadRequest)
         }
 
-        find_task(&pool, id).await?;
+        find_task(&state.pool, id).await?;
 
         let _result = sqlx::query("UPDATE task SET task=? WHERE id=?")
             .bind(&task.task)
             .bind(id)
-            .execute(&pool)
+            .execute(&state.pool)
             .await;
 
         let task = Task {
@@ -135,12 +128,12 @@ pub async fn update_task(
 )]
 pub async fn delete_task(
     Path(id): Path<i64>, 
-    Extension(pool): Extension<GenericPool>) -> Result<(StatusCode, Json<Value>), ApiError> {
-        find_task(&pool, id).await?;
+    State(state): State<AppState>) -> Result<(StatusCode, Json<Value>), ApiError> {
+        find_task(&state.pool, id).await?;
 
         sqlx::query("DELETE FROM task WHERE id=?")
             .bind(id)
-            .execute(&pool)
+            .execute(&state.pool)
             .await
             .map_err(|_| {
                 ApiError::NotFound
