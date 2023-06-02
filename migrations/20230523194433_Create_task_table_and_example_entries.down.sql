@@ -1,2 +1,2 @@
 -- Down: Remove initial tasks table
-DROP TABLE task;
+DROP TABLE IF EXISTS task;
