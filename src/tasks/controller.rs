@@ -2,12 +2,12 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 
 use axum::Json;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::{GenericPool, AppState};
 use crate::errors::ApiError;
+use crate::{AppState, GenericPool};
 
-use super::model::{Task};
+use super::model::Task;
 
 #[utoipa::path(
     get,
@@ -19,11 +19,10 @@ use super::model::{Task};
 pub async fn all_tasks(State(state): State<AppState>) -> Result<Json<Vec<Task>>, ApiError> {
     let sql = "SELECT * FROM task ".to_string();
 
-    let task = sqlx::query_as::<_, Task>(&sql).fetch_all(&state.pool)
+    let task = sqlx::query_as::<_, Task>(&sql)
+        .fetch_all(&state.pool)
         .await
-        .map_err(|_| {
-            ApiError::InternalServerError
-        })?;
+        .map_err(|_| ApiError::InternalServerError)?;
 
     Ok(Json(task))
 }
@@ -36,17 +35,16 @@ pub async fn all_tasks(State(state): State<AppState>) -> Result<Json<Vec<Task>>,
     )
 )]
 pub async fn task(
-    Path(id):Path<i32>, 
-    State(state): State<AppState>) -> Result<Json<Task>, ApiError> {
-        let task: Task = sqlx::query_as("SELECT * FROM task where id=?")
-            .bind(id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|_| {
-                ApiError::NotFound
-            })?;
+    Path(id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<Json<Task>, ApiError> {
+    let task: Task = sqlx::query_as("SELECT * FROM task where id=?")
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| ApiError::NotFound)?;
 
-        Ok(Json(task))  
+    Ok(Json(task))
 }
 
 #[utoipa::path(
@@ -57,26 +55,26 @@ pub async fn task(
     )
 )]
 pub async fn new_task(
-    State(state): State<AppState>, 
-    Json(task): Json<Task>) -> Result<(StatusCode, Json<Task>), ApiError> {
-        if task.id.is_some() || task.task.is_empty() {
-            return Err(ApiError::BadRequest);
-        }
+    State(state): State<AppState>,
+    Json(task): Json<Task>,
+) -> Result<(StatusCode, Json<Task>), ApiError> {
+    if task.id.is_some() || task.task.is_empty() {
+        return Err(ApiError::BadRequest);
+    }
 
-        let id = sqlx::query("INSERT INTO task (task) values (?)")
-                .bind(&task.task)
-                .execute(&state.pool)
-                .await
-                .map_err(|_| {
-                    ApiError::InternalServerError
-                })?.last_insert_rowid();
+    let id = sqlx::query("INSERT INTO task (task) values (?)")
+        .bind(&task.task)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| ApiError::InternalServerError)?
+        .last_insert_rowid();
 
-        let task = Task { 
-            id: Some(id), 
-            task: task.task
-        };
+    let task = Task {
+        id: Some(id),
+        task: task.task,
+    };
 
-        Ok((StatusCode::CREATED, Json(task)))
+    Ok((StatusCode::CREATED, Json(task)))
 }
 
 async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
@@ -84,11 +82,9 @@ async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
         .bind(id)
         .fetch_one(pool)
         .await
-        .map_err(|_| {
-            ApiError::NotFound
-        })?;
+        .map_err(|_| ApiError::NotFound)?;
 
-        Ok(())
+    Ok(())
 }
 
 #[utoipa::path(
@@ -99,45 +95,42 @@ async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
     )
 )]
 pub async fn update_task(
-    Path(id): Path<i64>, 
+    Path(id): Path<i64>,
     State(state): State<AppState>,
-    Json(task): Json<Task>) -> Result<(StatusCode, Json<Task>), ApiError> {
-        if task.id.is_some() && task.id.unwrap() != id {
-            return Err(ApiError::BadRequest)
-        }
+    Json(task): Json<Task>,
+) -> Result<(StatusCode, Json<Task>), ApiError> {
+    if task.id.is_some() && task.id.unwrap() != id {
+        return Err(ApiError::BadRequest);
+    }
 
-        find_task(&state.pool, id).await?;
+    find_task(&state.pool, id).await?;
 
-        let _result = sqlx::query("UPDATE task SET task=? WHERE id=?")
-            .bind(&task.task)
-            .bind(id)
-            .execute(&state.pool)
-            .await;
+    let _result = sqlx::query("UPDATE task SET task=? WHERE id=?")
+        .bind(&task.task)
+        .bind(id)
+        .execute(&state.pool)
+        .await;
 
-        let task = Task {
-            id: Some(id),
-            task: task.task
-        };
+    let task = Task {
+        id: Some(id),
+        task: task.task,
+    };
 
-        Ok((StatusCode::OK, Json(task)))
+    Ok((StatusCode::OK, Json(task)))
 }
 
-#[utoipa::path(
-    delete,
-    path = "/tasks/{id}"
-)]
+#[utoipa::path(delete, path = "/tasks/{id}")]
 pub async fn delete_task(
-    Path(id): Path<i64>, 
-    State(state): State<AppState>) -> Result<(StatusCode, Json<Value>), ApiError> {
-        find_task(&state.pool, id).await?;
+    Path(id): Path<i64>,
+    State(state): State<AppState>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    find_task(&state.pool, id).await?;
 
-        sqlx::query("DELETE FROM task WHERE id=?")
-            .bind(id)
-            .execute(&state.pool)
-            .await
-            .map_err(|_| {
-                ApiError::NotFound
-            })?;
+    sqlx::query("DELETE FROM task WHERE id=?")
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| ApiError::NotFound)?;
 
-            Ok((StatusCode::OK, Json(json!({"msg": "Task Deleted"}))))
+    Ok((StatusCode::OK, Json(json!({"msg": "Task Deleted"}))))
 }

@@ -1,19 +1,23 @@
 #![forbid(unsafe_code)]
 
-mod tasks;
-mod errors; //makes custom errors available to modules
+mod errors;
+mod tasks; //makes custom errors available to modules
 
 use std::{env, net::SocketAddr};
 
-use axum::{routing::{get, post, put, delete}, Router, response::Redirect};
-use sqlx::{Sqlite, migrate::MigrateDatabase, Pool};
+use axum::{
+    response::Redirect,
+    routing::{delete, get, post, put},
+    Router,
+};
+use sqlx::{migrate::MigrateDatabase, Pool, Sqlite};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Clone)]
 pub struct AppState {
-    pool: GenericPool
+    pool: GenericPool,
 }
 
 #[tokio::main]
@@ -48,19 +52,19 @@ async fn main() {
         Err(error) => panic!("Could not load .env file: {}", error),
     };
 
-    let pool: GenericPool = database_setup().await.expect("Could not create database pool");
+    let pool: GenericPool = database_setup()
+        .await
+        .expect("Could not create database pool");
 
-    let state = AppState {
-        pool: pool
-    };
+    let state = AppState { pool: pool };
 
     // create the app with routes
     let app = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .route("/", get(|| async {Redirect::permanent("/tasks")}))
+        .route("/", get(|| async { Redirect::permanent("/tasks") }))
         .route("/tasks", get(tasks::controller::all_tasks))
         .route("/tasks", post(tasks::controller::new_task))
-        .route("/tasks/:id",get(tasks::controller::task))
+        .route("/tasks/:id", get(tasks::controller::task))
         .route("/tasks/:id", put(tasks::controller::update_task))
         .route("/tasks/:id", delete(tasks::controller::delete_task))
         .layer(TraceLayer::new_for_http())
@@ -82,14 +86,14 @@ type GenericPool = Pool<Sqlite>;
 /// - creates SqlLite database if missing
 /// - runs sqlx migrations
 /// - creates a connection pool
-/// 
+///
 /// Returns database connection pool
-async fn database_setup() 
-    -> anyhow::Result<GenericPool> {
+async fn database_setup() -> anyhow::Result<GenericPool> {
     let database_url = &env::var("DATABASE_URL").expect("DATABASE_URL not set");
     tracing::debug!("Using database URL {}", database_url);
     create_database_if_missing(database_url).await;
-    let pool = create_database_pool(database_url).await
+    let pool = create_database_pool(database_url)
+        .await
         .expect("unable to create database pool");
     // run migrations
     sqlx::migrate!().run(&pool).await.unwrap();
@@ -106,14 +110,13 @@ async fn create_database_if_missing(database_url: &str) {
         tracing::info!("Creating database {}", &database_url);
         match Sqlite::create_database(database_url).await {
             Ok(_) => tracing::info!("Database created successfully"),
-            Err(error) => tracing::error!("Error creating database: {}", error)
+            Err(error) => tracing::error!("Error creating database: {}", error),
         }
     } else {
         tracing::debug!("Database already exists");
     }
 }
 
-async fn create_database_pool(database_url: &str) 
-    -> anyhow::Result<GenericPool> {
+async fn create_database_pool(database_url: &str) -> anyhow::Result<GenericPool> {
     Ok(Pool::connect(database_url).await?)
 }
