@@ -17,7 +17,7 @@ use super::model::Task;
     )
 )]
 pub async fn all_tasks(State(state): State<AppState>) -> Result<Json<Vec<Task>>, ApiError> {
-    let sql = "SELECT * FROM task ".to_string();
+    let sql = "SELECT * FROM tasks ".to_string();
 
     let task = sqlx::query_as::<_, Task>(&sql)
         .fetch_all(&state.pool)
@@ -38,7 +38,7 @@ pub async fn task(
     Path(id): Path<i32>,
     State(state): State<AppState>,
 ) -> Result<Json<Task>, ApiError> {
-    let task: Task = sqlx::query_as("SELECT * FROM task where id=?")
+    let task: Task = sqlx::query_as("SELECT * FROM tasks where id=?")
         .bind(id)
         .fetch_one(&state.pool)
         .await
@@ -62,7 +62,7 @@ pub async fn new_task(
         return Err(ApiError::BadRequest);
     }
 
-    let id = sqlx::query("INSERT INTO task (task) values (?)")
+    let id = sqlx::query("INSERT INTO tasks (task) values (?)")
         .bind(&task.task)
         .execute(&state.pool)
         .await
@@ -78,7 +78,7 @@ pub async fn new_task(
 }
 
 async fn find_task(pool: &GenericPool, id: i64) -> Result<(), ApiError> {
-    let _find: Task = sqlx::query_as("SELECT * FROM task where id=?")
+    let _find: Task = sqlx::query_as("SELECT * FROM tasks where id=?")
         .bind(id)
         .fetch_one(pool)
         .await
@@ -105,7 +105,7 @@ pub async fn update_task(
 
     find_task(&state.pool, id).await?;
 
-    let _result = sqlx::query("UPDATE task SET task=? WHERE id=?")
+    let _result = sqlx::query("UPDATE tasks SET task=? WHERE id=?")
         .bind(&task.task)
         .bind(id)
         .execute(&state.pool)
@@ -126,7 +126,7 @@ pub async fn delete_task(
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     find_task(&state.pool, id).await?;
 
-    sqlx::query("DELETE FROM task WHERE id=?")
+    sqlx::query("DELETE FROM tasks WHERE id=?")
         .bind(id)
         .execute(&state.pool)
         .await

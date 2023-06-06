@@ -1,10 +1,12 @@
 -- Up: Initial Tasks table
-CREATE TABLE task (
-    id  INTEGER PRIMARY KEY,
+CREATE TABLE tasks
+(
+    id INTEGER PRIMARY KEY,
     task varchar(255) NOT NULL
 );
 
-INSERT INTO task (id, task)
+INSERT INTO tasks
+    (id, task)
 VALUES
     (1, "Read README"),
     (2, "See if it runs"),
